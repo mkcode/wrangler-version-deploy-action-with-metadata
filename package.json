@@ -1,0 +1,32 @@
+{
+  "name": "wrangler-version-deploy-action-with-metadata",
+  "version": "0.1.0",
+  "private": false,
+  "description": "A GitHub Action to deploy via Wrangler v4 and expose deployment metadata, with customizable messages and tags.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsup src/index.ts --format=cjs --minify --sourcemap --out-dir dist",
+    "prepare": "pnpm build",
+    "lint": "echo \"no lint setup for this package yet\""
+  },
+  "keywords": [
+    "github-action",
+    "cloudflare",
+    "wrangler",
+    "deployment",
+    "metadata",
+    "ci",
+    "cd"
+  ],
+  "author": "neighbor",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/exec": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.6.0"
+  }
+}

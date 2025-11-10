@@ -1,0 +1,46 @@
+name: "Wrangler Version Deploy Action with Metadata"
+description: "Deploy Cloudflare Workers/Pages using Wrangler v4 with customizable messages and tags derived from GitHub metadata."
+author: "neighbor"
+branding:
+  icon: "cloud"
+  color: "blue"
+
+inputs:
+  api_token:
+    description: "Cloudflare API token. Pass via secrets (e.g. secrets.CLOUDFLARE_API_TOKEN)."
+    required: true
+  wrangler_command:
+    description: "Wrangler subcommand to run (default: deploy). Example: deploy"
+    required: false
+    default: "deploy"
+  wrangler_args:
+    description: "Additional arguments passed directly to Wrangler. Example: --env production"
+    required: false
+  message_template:
+    description: >
+      Template for a deployment message derived from CI and deployment metadata.
+      Supports variables like:
+      {{owner}}, {{repo}}, {{branch}}, {{ref}}, {{sha}}, {{short_sha}},
+      {{actor}}, {{run_id}}, {{run_number}},
+      {{commit_message}}, {{short_commit_message}},
+      {{deployment_url}}, {{version_id}}.
+    required: false
+  tag_template:
+    description: >
+      Template for a deployment tag/label derived from CI and deployment metadata.
+      Supports the same variables as message_template.
+    required: false
+
+outputs:
+  deployment_url:
+    description: "The URL of the deployed resource, if detected from Wrangler output."
+  version_id:
+    description: "The deployed version ID or similar identifier, if detected from Wrangler output."
+  message:
+    description: "The rendered deployment message from message_template (if provided)."
+  tag:
+    description: "The rendered deployment tag from tag_template (if provided)."
+
+runs:
+  using: "node20"
+  main: "dist/index.js"
