@@ -47,6 +47,8 @@ This Action:
   - `message`: The final rendered message.
   - `tag`: The final rendered tag (if any).
 - `only_upload` mode when you want to upload a version and deploy it separately.
+- `wrangler_command` lets you control exactly how Wrangler is invoked (e.g. `wrangler`, `npx wrangler@4`, `pnpm dlx wrangler@4`).
+- `working_directory` lets you target a specific folder in a monorepo when running Wrangler commands.
 
 ## How it works
 
@@ -88,11 +90,13 @@ This upload-then-deploy flow is what enables meaningful messages to show up in C
 You must:
 
 - Use Wrangler v4 (Versions API support required).
-- Ensure `wrangler` is available in your GitHub Actions runner:
-  - Example:
-    - `pnpm dlx wrangler@4 --version`
-    - or `npx wrangler@4 --version`
-  - or add Wrangler v4 as a dev dependency and use it from PATH.
+- Ensure you have a reliable way to invoke Wrangler v4:
+-  - You specify this explicitly via the `wrangler_command` input.
+-  - Examples:
+-    - `wrangler`
+-    - `npx wrangler@4`
+-    - `pnpm dlx wrangler@4`
+-  - No separate install step is required if your `wrangler_command` handles it.
 - Provide a Cloudflare API token:
   - With appropriate permissions for your Worker.
   - Passed via `secrets` to the `api_token` input.
@@ -116,6 +120,27 @@ All inputs are strings (as per GitHub Actions) unless noted; booleans are passed
   - Cloudflare API token.
   - Recommended: `secrets.CLOUDFLARE_API_TOKEN`.
   - Used to set `CLOUDFLARE_API_TOKEN` for the Wrangler commands.
+
+- `wrangler_command` (required)
+  - How to invoke Wrangler.
+  - This is the base command (and optional leading arguments) that will be used for both upload and deploy.
+  - Examples:
+    - `wrangler`
+    - `npx wrangler@4`
+    - `pnpm dlx wrangler@4`
+  - The Action splits this into:
+    - Executable: first token
+    - Base args: remaining tokens
+  - Then runs:
+    - `<wrangler_command> versions upload ...`
+    - `<wrangler_command> versions deploy ...`
+
+- `working_directory` (optional)
+  - Working directory from which Wrangler commands will be executed.
+  - If set, it is used as the `cwd` for both:
+    - `versions upload`
+    - `versions deploy`
+  - Useful for monorepos where your Worker lives in a subfolder.
 
 - `config` (required)
   - Path to the Wrangler configuration file.
@@ -241,6 +266,7 @@ jobs:
         uses: your-org/wrangler-version-deploy-action-with-metadata@v1
         with:
           api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wrangler_command: "pnpm dlx wrangler@4"
           config: "dist/server/wrangler.json"
           upload_args: "--env production"
           deploy_args: "--env production"
@@ -279,6 +305,7 @@ jobs:
         uses: your-org/wrangler-version-deploy-action-with-metadata@v1
         with:
           api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wrangler_command: "pnpm dlx wrangler@4"
           config: "wrangler.toml"
           upload_args: "--env staging"
           only_upload: "true"
@@ -327,7 +354,7 @@ You can combine outputs with other Actions to post deployment info back to PRs:
       });
 ```
 +
-+### Example 4: Monorepo - Deploy Only When a Folder Changes
+### Example 4: Monorepo - Deploy Only When a Folder Changes
 +
 +In a monorepo, you often want to:
 +
@@ -365,16 +392,18 @@ You can combine outputs with other Actions to post deployment info back to PRs:
 +
 +      - run: pnpm dlx wrangler@4 --version
 +
-+      - name: Upload + deploy worker-app via Versions API with metadata
-+        id: cf_deploy
-+        uses: your-org/wrangler-version-deploy-action-with-metadata@v1
-+        with:
-+          api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-+          config: "apps/worker-app/wrangler.toml"
-+          upload_args: "--env production"
-+          deploy_args: "--env production"
-+          message_template: "worker-app: {{repo}}@{{short_sha}} on {{branch}} (run {{run_number}})"
-+```
+      - name: Upload + deploy worker-app via Versions API with metadata
+        id: cf_deploy
+        uses: your-org/wrangler-version-deploy-action-with-metadata@v1
+        with:
+          api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wrangler_command: "pnpm dlx wrangler@4"
+          working_directory: "apps/worker-app"
+          config: "wrangler.toml"
+          upload_args: "--env production"
+          deploy_args: "--env production"
+          message_template: "worker-app: {{repo}}@{{short_sha}} on {{branch}} (run {{run_number}})"
+```
 
 ## Notes
 

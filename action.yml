@@ -9,6 +9,12 @@ inputs:
   api_token:
     description: "Cloudflare API token. Pass via secrets (e.g. secrets.CLOUDFLARE_API_TOKEN)."
     required: true
+  wrangler_command:
+    description: "Command used to invoke Wrangler (for example: wrangler, npx wrangler, pnpm dlx wrangler@4)."
+    required: true
+  working_directory:
+    description: "Working directory from which Wrangler commands will be executed (useful for monorepos)."
+    required: false
   config:
     description: "Path to the Wrangler configuration file (e.g. wrangler.toml or dist/server/wrangler.json). This will be passed as --config to both versions upload and versions deploy."
     required: true
