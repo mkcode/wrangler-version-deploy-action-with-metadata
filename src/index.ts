@@ -8,13 +8,33 @@ interface ParsedWranglerOutput {
   versionId?: string;
 }
 
+interface DeployMetadata {
+  owner?: string;
+  repo?: string;
+  ref?: string;
+  branch?: string;
+  sha?: string;
+  short_sha?: string;
+  actor?: string;
+  run_id?: string;
+  run_number?: string;
+  commit_message?: string;
+  short_commit_message?: string;
+}
+
 async function run(): Promise<void> {
   try {
     const apiToken = core.getInput("api_token", { required: true });
-    const wranglerCommand = core.getInput("wrangler_command") || "deploy";
-    const wranglerArgsRaw = core.getInput("wrangler_args") || "";
+    const onlyUploadInput = core.getInput("only_upload") || "false";
+    const onlyUpload = onlyUploadInput.toLowerCase() === "true";
+    const config = core.getInput("config", { required: true });
+    const uploadArgsRaw = core.getInput("upload_args") || "";
+    const deployArgsRaw = core.getInput("deploy_args") || "";
     const messageTemplate = core.getInput("message_template") || "";
     const tagTemplate = core.getInput("tag_template") || "";
+
+    const uploadArgsList = splitArgs(uploadArgsRaw);
+    const deployArgsList = splitArgs(deployArgsRaw);
 
     if (!apiToken) {
       core.setFailed("Cloudflare API token (api_token) is required.");
@@ -35,16 +55,45 @@ async function run(): Promise<void> {
       ].join(" | "),
     );
 
-    // Prepare Wrangler invocation.
-    // We assume `wrangler` is available in PATH (documented requirement).
-    const wranglerArgs = splitArgs(wranglerArgsRaw);
+    // Prepare Wrangler args from inputs (already parsed above).
 
-    core.info(`Running: wrangler ${[wranglerCommand, ...wranglerArgs].join(" ")}`);
+    // 1) Build message and tag from templates + metadata (no deployment data yet).
+    const preTemplateContext: TemplateContext = {
+      ...metadata,
+      deployment_url: undefined,
+      version_id: undefined,
+    };
 
-    let stdOut = "";
-    let stdErr = "";
+    const renderedMessage = messageTemplate
+      ? renderTemplate(messageTemplate, preTemplateContext)
+      : buildDefaultMessage(metadata);
+    const renderedTag = tagTemplate
+      ? renderTemplate(tagTemplate, preTemplateContext)
+      : buildDefaultTag(metadata);
 
-    const execOptions: exec.ExecOptions = {
+    core.info(`Using deployment message: ${renderedMessage}`);
+    if (renderedTag) {
+      core.info(`Using deployment tag: ${renderedTag}`);
+    }
+
+    // 2) Run `wrangler versions upload` to create a new version with metadata.
+    // We assume the user is on Wrangler v4+ and that `versions` commands are available.
+    // The actual Worker configuration (e.g. wrangler.toml) is controlled by the caller.
+    const uploadArgs = [
+      "versions",
+      "upload",
+      "--config",
+      config,
+      ...uploadArgsList,
+      `--message=${renderedMessage}`,
+    ];
+
+    core.info(`Running: wrangler ${uploadArgs.join(" ")}`);
+
+    let uploadStdout = "";
+    let uploadStderr = "";
+
+    const uploadOptions: exec.ExecOptions = {
       env: {
         ...process.env,
         CLOUDFLARE_API_TOKEN: apiToken,
@@ -52,67 +101,126 @@ async function run(): Promise<void> {
       listeners: {
         stdout: (data: Buffer) => {
           const text = data.toString();
-          stdOut += text;
+          uploadStdout += text;
           core.info(text.trimEnd());
         },
         stderr: (data: Buffer) => {
           const text = data.toString();
-          stdErr += text;
-          // Keep stderr visible to aid debugging but avoid leaking secrets.
+          uploadStderr += text;
           core.error(text.trimEnd());
         },
       },
     };
 
-    const exitCode = await exec.exec(
+    const uploadExitCode = await exec.exec(
       "wrangler",
-      [wranglerCommand, ...wranglerArgs],
-      execOptions,
+      uploadArgs,
+      uploadOptions,
     );
 
-    if (exitCode !== 0) {
+    if (uploadExitCode !== 0) {
       core.setFailed(
-        `Wrangler command failed with exit code ${exitCode}. See logs above for details.`,
+        `wrangler versions upload failed with exit code ${uploadExitCode}. See logs above for details.`,
       );
       return;
     }
 
-    const { deploymentUrl, versionId } = parseWranglerOutput(stdOut);
+    const versionId = parseVersionIdFromUpload(uploadStdout);
+
+    if (onlyUpload) {
+      if (versionId) {
+        core.info(`Parsed Worker Version ID (only_upload=true): ${versionId}`);
+        core.setOutput("version_id", versionId);
+      } else {
+        core.info(
+          "only_upload=true and no Worker Version ID could be parsed; exiting successfully.",
+        );
+      }
+
+      if (renderedMessage) {
+        core.setOutput("message", renderedMessage);
+      }
+      if (renderedTag) {
+        core.setOutput("tag", renderedTag);
+      }
+
+      return;
+    }
+
+    if (!versionId) {
+      core.setFailed(
+        "Failed to parse Worker Version ID from wrangler versions upload output.",
+      );
+      return;
+    }
+    core.info(`Parsed Worker Version ID: ${versionId}`);
+
+    // 3) Run `wrangler versions deploy <versionId>` non-interactively with the same message.
+    const deployArgs = [
+      "versions",
+      "deploy",
+      versionId,
+      "-y",
+      "--config",
+      config,
+      ...deployArgsList,
+      `--message=${renderedMessage}`,
+    ];
+
+    core.info(`Running: wrangler ${deployArgs.join(" ")}`);
+
+    let deployStdout = "";
+    let deployStderr = "";
+
+    const deployOptions: exec.ExecOptions = {
+      env: {
+        ...process.env,
+        CLOUDFLARE_API_TOKEN: apiToken,
+      },
+      listeners: {
+        stdout: (data: Buffer) => {
+          const text = data.toString();
+          deployStdout += text;
+          core.info(text.trimEnd());
+        },
+        stderr: (data: Buffer) => {
+          const text = data.toString();
+          deployStderr += text;
+          core.error(text.trimEnd());
+        },
+      },
+    };
+
+    const deployExitCode = await exec.exec(
+      "wrangler",
+      deployArgs,
+      deployOptions,
+    );
+
+    if (deployExitCode !== 0) {
+      core.setFailed(
+        `wrangler versions deploy failed with exit code ${deployExitCode}. See logs above for details.`,
+      );
+      return;
+    }
+
+    const { deploymentUrl } = parseWranglerOutput(deployStdout);
 
     if (deploymentUrl) {
       core.info(`Detected deployment URL: ${deploymentUrl}`);
       core.setOutput("deployment_url", deploymentUrl);
     } else {
       core.info(
-        "No deployment URL detected from Wrangler output. If this is unexpected, please open an issue with example logs.",
+        "No deployment URL detected from Wrangler deploy output. If this is unexpected, please open an issue with example logs.",
       );
     }
 
-    if (versionId) {
-      core.info(`Detected deployment version/ID: ${versionId}`);
-      core.setOutput("version_id", versionId);
-    }
-
-    const templateContext: TemplateContext = {
-      ...metadata,
-      deployment_url: deploymentUrl,
-      version_id: versionId,
-    };
-
-    const renderedMessage = messageTemplate
-      ? renderTemplate(messageTemplate, templateContext)
-      : "";
-    const renderedTag = tagTemplate
-      ? renderTemplate(tagTemplate, templateContext)
-      : "";
-
+    // Expose core metadata outputs for downstream steps.
+    core.setOutput("version_id", versionId);
     if (renderedMessage) {
-      core.info(`Rendered deployment message: ${renderedMessage}`);
       core.setOutput("message", renderedMessage);
     }
-
     if (renderedTag) {
-      core.info(`Rendered deployment tag: ${renderedTag}`);
       core.setOutput("tag", renderedTag);
     }
   } catch (unknownError) {
@@ -124,29 +232,20 @@ async function run(): Promise<void> {
 /**
  * Collect GitHub Actions + git metadata used for templating.
  */
-async function collectMetadata(): Promise<{
-  repo?: string;
-  owner?: string;
-  ref?: string;
-  branch?: string;
-  sha?: string;
-  short_sha?: string;
-  actor?: string;
-  run_id?: string;
-  run_number?: string;
-  commit_message?: string;
-  short_commit_message?: string;
-}> {
+async function collectMetadata(): Promise<DeployMetadata> {
   const repoFull = process.env.GITHUB_REPOSITORY;
-  const [owner, repoName] = repoFull ? repoFull.split("/") : [undefined, undefined];
+  const [owner, repoName] = repoFull
+    ? repoFull.split("/")
+    : [undefined, undefined];
 
   const sha = process.env.GITHUB_SHA;
   const short_sha = sha ? sha.substring(0, 7) : undefined;
 
   const ref = process.env.GITHUB_REF;
-  const branch = ref && ref.startsWith("refs/heads/")
-    ? ref.substring("refs/heads/".length)
-    : undefined;
+  const branch =
+    ref && ref.startsWith("refs/heads/")
+      ? ref.substring("refs/heads/".length)
+      : undefined;
 
   const actor = process.env.GITHUB_ACTOR;
   const run_id = process.env.GITHUB_RUN_ID;
@@ -200,10 +299,13 @@ async function getLastCommitMessage(): Promise<string | undefined> {
  * Unknown variables are rendered as empty strings to keep messages clean.
  */
 function renderTemplate(template: string, context: TemplateContext): string {
-  return template.replace(/{{\s*([a-zA-Z0-9_]+)\s*}}/g, (_match, key: string) => {
-    const value = context[key];
-    return value !== undefined ? String(value) : "";
-  });
+  return template.replace(
+    /{{\s*([a-zA-Z0-9_]+)\s*}}/g,
+    (_match, key: string) => {
+      const value = context[key];
+      return value !== undefined ? String(value) : "";
+    },
+  );
 }
 
 /**
@@ -254,28 +356,62 @@ function splitArgs(raw: string): string[] {
 }
 
 /**
- * Best-effort parsing of Wrangler v4 output to extract a deployment URL and version ID.
- *
- * This is intentionally conservative. As we refine our understanding of Wrangler's
- * structured output, we can tighten this logic.
+ * Parse deployment URL from Wrangler output.
+ * This remains a best-effort heuristic until we rely on a stable structured format.
  */
 function parseWranglerOutput(output: string): ParsedWranglerOutput {
   const result: ParsedWranglerOutput = {};
 
   // Heuristic: first URL-looking token is likely the deployment URL.
-  // Matches http(s)://..., stopping at whitespace or quotes.
   const urlMatch = output.match(/https?:\/\/[^\s"]+/);
   if (urlMatch) {
     result.deploymentUrl = urlMatch[0];
   }
 
-  // Heuristic: look for "version" tokens (e.g., "version abc123") and capture the ID.
-  const versionMatch = output.match(/\bversion\b[:\s]+([A-Za-z0-9._-]+)/i);
-  if (versionMatch) {
-    result.versionId = versionMatch[1];
+  return result;
+}
+
+/**
+ * Parse Worker Version ID from `wrangler versions upload` output.
+ * Mirrors the behavior from the standalone deploy-cloudflare-version script.
+ */
+function parseVersionIdFromUpload(output: string): string | undefined {
+  const match = output.match(/Worker Version ID:\s*([0-9a-fA-F-]+)/);
+  return match?.[1];
+}
+
+/**
+ * Build a simple default message when no explicit template is provided.
+ * Format: branch@sha6: first-line-of-commit-message (trimmed).
+ */
+function buildDefaultMessage(meta: DeployMetadata): string {
+  const branch = meta.branch || "";
+  const shortSha = meta.short_sha || (meta.sha ? meta.sha.substring(0, 6) : "");
+  const baseMessage = meta.short_commit_message || meta.commit_message || "";
+
+  const prefixParts: string[] = [];
+  if (branch) {
+    if (shortSha) {
+      prefixParts.push(`${branch}@${shortSha}`);
+    } else {
+      prefixParts.push(branch);
+    }
+  } else if (shortSha) {
+    prefixParts.push(shortSha);
   }
 
-  return result;
+  const prefix = prefixParts.join("");
+  const combined = prefix ? `${prefix}: ${baseMessage}` : baseMessage;
+
+  return combined.slice(0, 100);
+}
+
+/**
+ * Build a compact default tag when no tag_template is provided.
+ * By default, this action does not generate a tag, so this returns an empty string.
+ */
+function buildDefaultTag(_meta: DeployMetadata): string {
+  return "";
 }
 
 function toError(e: unknown): Error {
