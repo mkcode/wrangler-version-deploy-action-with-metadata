@@ -3,7 +3,7 @@ description: "Deploy Cloudflare Workers/Pages using Wrangler v4 with customizabl
 author: "neighbor"
 branding:
   icon: "cloud"
-  color: "blue"
+  color: "orange"
 
 inputs:
   api_token:
@@ -16,8 +16,8 @@ inputs:
     description: "Working directory from which Wrangler commands will be executed (useful for monorepos)."
     required: false
   config:
-    description: "Path to the Wrangler configuration file (e.g. wrangler.toml or dist/server/wrangler.json). This will be passed as --config to both versions upload and versions deploy."
-    required: true
+    description: "Optional path to the Wrangler configuration file (e.g. wrangler.toml or dist/server/wrangler.json). When provided, this will be passed as --config to both versions upload and versions deploy. If omitted, Wrangler's default config resolution is used."
+    required: false
   upload_args:
     description: "Additional arguments passed only to wrangler versions upload (excluding --config). Example: --env production"
     required: false

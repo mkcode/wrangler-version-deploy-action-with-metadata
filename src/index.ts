@@ -93,8 +93,7 @@ async function run(): Promise<void> {
     const uploadArgs = [
       "versions",
       "upload",
-      "--config",
-      config,
+      ...(config ? ["--config", config] : []),
       ...uploadArgsList,
       `--message=${renderedMessage}`,
     ];
@@ -119,7 +118,6 @@ async function run(): Promise<void> {
         stderr: (data: Buffer) => {
           const text = data.toString();
           uploadStderr += text;
-          core.error(text.trimEnd());
         },
       },
     };
@@ -131,6 +129,9 @@ async function run(): Promise<void> {
     );
 
     if (uploadExitCode !== 0) {
+      if (uploadStderr.trim()) {
+        core.error(uploadStderr.trimEnd());
+      }
       core.setFailed(
         `wrangler versions upload failed with exit code ${uploadExitCode}. See logs above for details.`,
       );
@@ -173,8 +174,7 @@ async function run(): Promise<void> {
       "deploy",
       versionId,
       "-y",
-      "--config",
-      config,
+      ...(config ? ["--config", config] : []),
       ...deployArgsList,
       `--message=${renderedMessage}`,
     ];
@@ -199,7 +199,6 @@ async function run(): Promise<void> {
         stderr: (data: Buffer) => {
           const text = data.toString();
           deployStderr += text;
-          core.error(text.trimEnd());
         },
       },
     };
@@ -211,6 +210,9 @@ async function run(): Promise<void> {
     );
 
     if (deployExitCode !== 0) {
+      if (deployStderr.trim()) {
+        core.error(deployStderr.trimEnd());
+      }
       core.setFailed(
         `wrangler versions deploy failed with exit code ${deployExitCode}. See logs above for details.`,
       );
