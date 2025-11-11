@@ -8,32 +8,35 @@ This Action:
 - Lets you define custom deployment messages (and an optional tag string) using templates.
 - Exposes the Worker Version ID and deployment URL as outputs for downstream steps.
 - Is designed for workflows where you build in GitHub Actions and want clean, traceable deploys in Cloudflare.
-+
-+## When to use this instead of the official Cloudflare Action
-+
-+Use this Action when:
-+
-+- You want full control over how and where your Worker is built:
-+  - You build in GitHub Actions (pnpm, npm, turbo, etc.) and only need Wrangler for the final upload/deploy.
-+- You want rich, commit-aware metadata in Cloudflare:
-+  - You care about seeing branch, commit, actor, and custom messages in the Cloudflare Versions UI.
-+  - You want stable `version_id` outputs to link deploys back to code, PRs, or changelogs.
-+- You’re in a monorepo:
-+  - You only want to build and deploy when a specific app/package directory changes.
-+  - You want an Action that targets a specific `config` path and doesn’t assume a single-project repo.
-+- You prefer an explicit upload → deploy flow:
-+  - You want `wrangler versions upload` + `wrangler versions deploy <versionId>` semantics instead of a generic `wrangler deploy`.
-+
-+The official Cloudflare Actions are great if:
-+
-+- You want a quick, simple deploy with minimal control.
-+- You’re okay with less flexibility around build steps, metadata, and monorepo layouts.
-+
-+Use this Action if you need:
-+
-+- Monorepo-friendly behavior.
-+- Custom build pipelines.
-+- Strong, composable metadata around each deployment.
+  
+## When to use this instead of the official Cloudflare Action
+
+Use this Action when:
+
+- You want full control over how and where your Worker is built:
+  - You build in GitHub Actions (pnpm, npm, turbo, etc.) and only need Wrangler for the final upload/deploy.
+- You want rich, commit-aware metadata in Cloudflare:
+  - You care about seeing branch, commit, actor, and custom messages in the Cloudflare Versions UI.
+  - You want stable `version_id` outputs to link deploys back to code, PRs, or changelogs.
+- You’re in a monorepo:
+  - You only want to build and deploy when a specific app/package directory changes.
+  - You want an Action that targets a specific `config` path and doesn’t assume a single-project repo.
+- You prefer an explicit upload → deploy flow:
+  - You want `wrangler versions upload` + `wrangler versions deploy <versionId>` semantics instead of a generic `wrangler deploy`.
+- You want your cloudflare deployment dashboard to look like this:
+<img width="2168" height="886" alt="Zen-2025-11-10 at 21 04 46@2x" src="https://github.com/user-attachments/assets/27c329b9-dc68-438d-ba6e-a264bac14390" />
+
+
+The official Cloudflare Actions are great if:
+
+- You want a quick, simple deploy with minimal control.
+- You’re okay with less flexibility around build steps, metadata, and monorepo layouts.
+
+Use this Action if you need:
+
+- Monorepo-friendly behavior.
+- Custom build pipelines.
+- Strong, composable metadata around each deployment.
 
 ## Features
 
