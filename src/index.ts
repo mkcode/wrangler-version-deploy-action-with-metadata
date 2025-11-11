@@ -45,9 +45,7 @@ async function run(): Promise<void> {
         ? workingDirectoryInput.trim()
         : undefined;
 
-    const wranglerCommandParts = wranglerCommandInput.trim().split(/\s+/);
-    const wranglerExec = wranglerCommandParts[0];
-    const wranglerBaseArgs = wranglerCommandParts.slice(1);
+    const wranglerCommand = wranglerCommandInput.trim();
 
     if (!apiToken) {
       core.setFailed("Cloudflare API token (api_token) is required.");
@@ -93,7 +91,6 @@ async function run(): Promise<void> {
     // We assume the user is on Wrangler v4+ and that `versions` commands are available.
     // The actual Worker configuration (e.g. wrangler.toml) is controlled by the caller.
     const uploadArgs = [
-      ...wranglerBaseArgs,
       "versions",
       "upload",
       "--config",
@@ -102,7 +99,7 @@ async function run(): Promise<void> {
       `--message=${renderedMessage}`,
     ];
 
-    core.info(`Running: wrangler ${uploadArgs.join(" ")}`);
+    core.info(`Running upload: ${wranglerCommand} ${uploadArgs.join(" ")}`);
 
     let uploadStdout = "";
     let uploadStderr = "";
@@ -128,7 +125,7 @@ async function run(): Promise<void> {
     };
 
     const uploadExitCode = await exec.exec(
-      wranglerExec,
+      wranglerCommand,
       uploadArgs,
       uploadOptions,
     );
@@ -172,7 +169,6 @@ async function run(): Promise<void> {
 
     // 3) Run `wrangler versions deploy <versionId>` non-interactively with the same message.
     const deployArgs = [
-      ...wranglerBaseArgs,
       "versions",
       "deploy",
       versionId,
@@ -183,7 +179,7 @@ async function run(): Promise<void> {
       `--message=${renderedMessage}`,
     ];
 
-    core.info(`Running: wrangler ${deployArgs.join(" ")}`);
+    core.info(`Running deploy: ${wranglerCommand} ${deployArgs.join(" ")}`);
 
     let deployStdout = "";
     let deployStderr = "";
@@ -209,7 +205,7 @@ async function run(): Promise<void> {
     };
 
     const deployExitCode = await exec.exec(
-      wranglerExec,
+      wranglerCommand,
       deployArgs,
       deployOptions,
     );
