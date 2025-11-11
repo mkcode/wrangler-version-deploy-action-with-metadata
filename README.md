@@ -91,12 +91,12 @@ You must:
 
 - Use Wrangler v4 (Versions API support required).
 - Ensure you have a reliable way to invoke Wrangler v4:
--  - You specify this explicitly via the `wrangler_command` input.
--  - Examples:
--    - `wrangler`
--    - `npx wrangler@4`
--    - `pnpm dlx wrangler@4`
--  - No separate install step is required if your `wrangler_command` handles it.
+  - You specify this explicitly via the `wrangler_command` input.
+  - Examples:
+    - `wrangler`
+    - `npx wrangler@4`
+    - `pnpm dlx wrangler@4`
+  - No separate install step is required if your `wrangler_command` handles it.
 - Provide a Cloudflare API token:
   - With appropriate permissions for your Worker.
   - Passed via `secrets` to the `api_token` input.
@@ -109,6 +109,7 @@ You must:
 This Action does NOT:
 
 - Build your project.
+- Install wrangler for you.
 - Infer your Wrangler config automatically.
 - Manage `account_id` for you (Wrangler should pick that up from config/env).
 
@@ -126,11 +127,8 @@ All inputs are strings (as per GitHub Actions) unless noted; booleans are passed
   - This is the base command (and optional leading arguments) that will be used for both upload and deploy.
   - Examples:
     - `wrangler`
-    - `npx wrangler@4`
+    - `npx wrangler`
     - `pnpm dlx wrangler@4`
-  - The Action splits this into:
-    - Executable: first token
-    - Base args: remaining tokens
   - Then runs:
     - `<wrangler_command> versions upload ...`
     - `<wrangler_command> versions deploy ...`
@@ -142,13 +140,14 @@ All inputs are strings (as per GitHub Actions) unless noted; booleans are passed
     - `versions deploy`
   - Useful for monorepos where your Worker lives in a subfolder.
 
-- `config` (required)
+- `config` (optional)
   - Path to the Wrangler configuration file.
-  - Passed as:
-    - `--config <config>`
-  - Applied to both:
-    - `wrangler versions upload`
-    - `wrangler versions deploy`
+  - When provided:
+    - Passed as `--config <config>` to both:
+      - `wrangler versions upload`
+      - `wrangler versions deploy`
+  - When omitted:
+    - Wrangler's default configuration resolution is used (for example, a `wrangler.toml` in the working directory).
 
 - `upload_args` (optional)
   - Extra arguments for:
@@ -267,7 +266,8 @@ jobs:
         with:
           api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           wrangler_command: "pnpm dlx wrangler@4"
-          config: "dist/server/wrangler.json"
+          working_directory: "dist/server"
+          config: "wrangler.json"
           upload_args: "--env production"
           deploy_args: "--env production"
           message_template: "Deployed {{repo}}@{{short_sha}} to {{branch}} by {{actor}} (run {{run_number}})"
@@ -306,6 +306,7 @@ jobs:
         with:
           api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           wrangler_command: "pnpm dlx wrangler@4"
+          working_directory: "."
           config: "wrangler.toml"
           upload_args: "--env staging"
           only_upload: "true"
@@ -353,69 +354,51 @@ You can combine outputs with other Actions to post deployment info back to PRs:
         ].filter(Boolean).join("\n")
       });
 ```
-+
+
 ### Example 4: Monorepo - Deploy Only When a Folder Changes
-+
-+In a monorepo, you often want to:
-+
-+- Only run builds/deploys when a specific app/package directory changes.
-+- Use a config file that lives within that directory.
-+
-+This example:
-+
-+- Triggers only when files under `apps/worker-app/` change.
-+- Uses the Wrangler config at `apps/worker-app/wrangler.toml`.
-+- Builds and deploys only that app.
-+
-+```yaml
-+name: Deploy Worker App (Monorepo)
-+
-+on:
-+  push:
-+    branches: [main]
-+    paths:
-+      - "apps/worker-app/**"
-+
-+jobs:
-+  deploy-worker-app:
-+    runs-on: ubuntu-latest
-+    defaults:
-+      run:
-+        working-directory: apps/worker-app
-+
-+    steps:
-+      - uses: actions/checkout@v4
-+
-+      # Install and build only this app
-+      # - run: pnpm install
-+      # - run: pnpm build
-+
-+      - run: pnpm dlx wrangler@4 --version
-+
-      - name: Upload + deploy worker-app via Versions API with metadata
-        id: cf_deploy
-        uses: your-org/wrangler-version-deploy-action-with-metadata@v1
-        with:
-          api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          wrangler_command: "pnpm dlx wrangler@4"
-          working_directory: "apps/worker-app"
-          config: "wrangler.toml"
-          upload_args: "--env production"
-          deploy_args: "--env production"
-          message_template: "worker-app: {{repo}}@{{short_sha}} on {{branch}} (run {{run_number}})"
-```
 
-## Notes
+In a monorepo, you often want to:
 
-- This Action focuses on being:
-  - Explicit about config (`config` input).
-  - Clear about which args go to upload vs deploy.
-  - Purpose-built for Wrangler v4’s Versions API.
-- If Wrangler’s output format changes:
-  - `deployment_url` parsing is best-effort.
-  - `version_id` parsing is based on the standard `Worker Version ID:` line.
-- For GitHub Marketplace:
-  - Reference it as `your-org/wrangler-version-deploy-action-with-metadata@v1`.
-  - Keep a `v1` tag pointing at the latest stable release.
+- Only run builds/deploys when a specific app/package directory changes.
+- Use a config file that lives within that directory.
 
-If you have real Wrangler output samples and want to harden the parsing further, you can refine this Action’s internals without changing the public interface described here.
+This example:
+
+- Triggers only when files under `apps/worker-app/` change.
+- Uses the Wrangler config at `apps/worker-app/wrangler.toml`.
+- Builds and deploys only that app.
+
+```yaml
+name: Deploy Worker App (Monorepo)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/worker-app/**"
+
+jobs:
+  deploy-worker-app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/worker-app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install and build only this app
+      # - run: pnpm install
+      # - run: pnpm build
+
+  name: Upload + deploy worker-app via Versions API with metadata
+  id: cf_deploy
+  uses: your-org/wrangler-version-deploy-action-with-metadata@v1
+  with:
+    api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    wrangler_command: "pnpm dlx wrangler@4"
+    working_directory: "apps/worker-app"
+    config: "wrangler.toml"
+    upload_args: "--env production"
+    deploy_args: "--env production"
+    message_template: "worker-app: {{repo}}@{{short_sha}} on {{branch}} (run {{run_number}})"

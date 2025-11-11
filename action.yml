@@ -1,6 +1,6 @@
 name: "Wrangler Version Deploy Action with Metadata"
 description: "Deploy Cloudflare Workers/Pages using Wrangler v4 with customizable messages and tags derived from GitHub metadata."
-author: "neighbor"
+author: "Chris Ewald"
 branding:
   icon: "cloud"
   color: "orange"
