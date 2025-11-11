@@ -2,6 +2,30 @@
 
 Deploy Cloudflare Workers using Wrangler v4's Versions API while attaching rich, commit-aware metadata to each deployment.
 
+## Quick Setup
+
+Add this job to your workflow:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Ensure Wrangler v4 is available in your workflow environment
+      - run: pnpm dlx wrangler@4 --version
+
+      - name: Deploy with metadata via Wrangler Versions API
+        uses: mkcode/wrangler-version-deploy-action-with-metadata@v1
+        with:
+          api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wrangler_command: "pnpm dlx wrangler@4"
+          config: "wrangler.toml"
+          upload_args: "--env production"
+          deploy_args: "--env production"
+```
+
 This Action:
 
 - Uses `wrangler versions upload` + `wrangler versions deploy` instead of plain `wrangler deploy`.
