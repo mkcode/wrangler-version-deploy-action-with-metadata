@@ -251,7 +251,7 @@ jobs:
 
       - name: Upload + deploy via Wrangler Versions with metadata
         id: cf_deploy
-        uses: mkcode/wrangler-version-deploy-action-with-metadata
+        uses: mkcode/wrangler-version-deploy-action-with-metadata@v1
         with:
           api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           wrangler_command: "pnpm dlx wrangler@4"
@@ -291,7 +291,7 @@ jobs:
 
       - name: Upload Worker Version with metadata (no deploy)
         id: cf_upload
-        uses: mkcode/wrangler-version-deploy-action-with-metadata
+        uses: mkcode/wrangler-version-deploy-action-with-metadata@v1
         with:
           api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           wrangler_command: "pnpm dlx wrangler@4"
@@ -381,13 +381,13 @@ jobs:
       # - run: pnpm build
 
       - name: Upload + deploy worker-app via Versions API with metadata
-      id: cf_deploy
-      uses: mkcode/wrangler-version-deploy-action-with-metadata
-      with:
-        api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        wrangler_command: "pnpm dlx wrangler@4"
-        working_directory: "apps/worker-app"
-        config: "wrangler.toml"
-        upload_args: "--env production"
-        deploy_args: "--env production"
-        message_template: "worker-app: {{repo}}@{{short_sha}} on {{branch}} (run {{run_number}})"
+        id: cf_deploy
+        uses: mkcode/wrangler-version-deploy-action-with-metadata@v1
+        with:
+          api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wrangler_command: "pnpm dlx wrangler@4"
+          working_directory: "apps/worker-app"
+          config: "wrangler.toml"
+          upload_args: "--env production"
+          deploy_args: "--env production"
+          message_template: "worker-app: {{repo}}@{{short_sha}} on {{branch}} (run {{run_number}})"
