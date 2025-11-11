@@ -113,7 +113,7 @@ async function run(): Promise<void> {
         stdout: (data: Buffer) => {
           const text = data.toString();
           uploadStdout += text;
-          core.info(text.trimEnd());
+          // Do not re-echo stdout here to avoid duplicate logs; Wrangler already prints to the console.
         },
         stderr: (data: Buffer) => {
           const text = data.toString();
@@ -194,7 +194,7 @@ async function run(): Promise<void> {
         stdout: (data: Buffer) => {
           const text = data.toString();
           deployStdout += text;
-          core.info(text.trimEnd());
+          // Do not re-echo stdout here to avoid duplicate logs; Wrangler already prints to the console.
         },
         stderr: (data: Buffer) => {
           const text = data.toString();
